@@ -1,0 +1,48 @@
+name: Architecture or rule proposal
+description: Propose a protocol, schema, validator, governance, or architectural change.
+title: "[Proposal]: "
+labels: ["proposal"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What concrete failure mode or governance gap does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Supporting evidence
+      description: Cite real cases, contracts, fixtures, or authoritative sources.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Separate proposed behavior from established project truth.
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Proposed behavioral risk
+      options:
+        - Critical
+        - High
+        - Medium
+        - Low
+        - Not a behavioral rule
+    validations:
+      required: true
+  - type: textarea
+    id: enforcement
+    attributes:
+      label: Enforcement plan
+      description: Identify schema carrier, minimum semantic children, validator, fixtures, CI, and downstream rejection where applicable.
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and migration impact
+      description: Explain versioning, public artifact, and migration consequences.
