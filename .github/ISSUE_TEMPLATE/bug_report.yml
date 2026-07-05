@@ -1,0 +1,40 @@
+name: Bug report
+description: Report reproducible incorrect behavior in the repository or implemented auditor.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, private repository data, or sensitive logs.
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened, and what contract or evidence supports it?
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Affected commit or version
+      placeholder: 40-character SHA or version
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and reproduction
+      description: Include safe, minimal evidence and exact steps. Do not expose secrets.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and limitations
+      description: Explain affected outputs, claims, or workflows and any uncertainty.
