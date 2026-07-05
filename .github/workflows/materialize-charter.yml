@@ -1,0 +1,49 @@
+name: Materialize project charter
+
+on:
+  push:
+    branches:
+      - chore/bootstrap-repository
+    paths:
+      - ".bootstrap/**"
+      - ".github/workflows/materialize-charter.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-charter-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out bootstrap branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Materialize and verify charter
+        run: python3 .bootstrap/materialize_charter.py
+
+      - name: Remove temporary payload
+        run: rm -rf .bootstrap
+
+      - name: Commit verified charter
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_CHARTER.md
+          git add -A .bootstrap
+          if git diff --cached --quiet; then
+            echo "No materialization changes to commit."
+            exit 0
+          fi
+          git commit -m "docs: add verified project charter"
+          git push
