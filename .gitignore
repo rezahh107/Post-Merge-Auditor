@@ -36,6 +36,9 @@ Thumbs.db
 *.pem
 *.key
 
+# Generated project files
+PROJECT_CHARTER.generated.md
+
 # Generated audit output
 artifacts/
 reports/
