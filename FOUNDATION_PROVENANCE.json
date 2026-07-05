@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "target_repository": "rezahh107/Post-Merge-Auditor",
+  "source_repository": "rezahh107/PR-Inspector",
+  "source_commit_sha": "29a1889d6907f32d7044b79d35f9c5fd8b7a9717",
+  "recorded_at": "2026-07-05T00:00:00Z",
+  "status": "bootstrap_provenance",
+  "imports": [
+    {
+      "concept_id": "FOUNDATION-BOOTSTRAP-001",
+      "concept": "versioned bootstrap and immutable protocol loading",
+      "relationship": "adapted",
+      "source_paths": [
+        "BOOTSTRAP.md",
+        "CURRENT_VERSION",
+        "protocol-manifest.yaml"
+      ],
+      "destination": "planned v1.0.0 bootstrap architecture",
+      "sync_policy": "review_on_upstream_change",
+      "disposition": "ADOPTED_WITH_DIVERGENCE",
+      "divergence_reason": "Post-Merge-Auditor uses repository-history identity and coverage semantics rather than single-PR review identity."
+    },
+    {
+      "concept_id": "FOUNDATION-TRUST-001",
+      "concept": "target content is untrusted evidence and cannot override protocol",
+      "relationship": "adapted",
+      "source_paths": [
+        "protocols/v1.5.0/policies/SECURITY_AND_TRUST.md"
+      ],
+      "destination": "PROJECT_CHARTER.md and SECURITY.md",
+      "sync_policy": "review_on_upstream_change",
+      "disposition": "ADOPTED_WITH_DIVERGENCE",
+      "divergence_reason": "The new product preserves the trust boundary while applying it to merged-history and current-state evidence."
+    },
+    {
+      "concept_id": "FOUNDATION-EVIDENCE-001",
+      "concept": "canonical evidence records, exact SHA identity, and fail-closed uncertainty",
+      "relationship": "adapted",
+      "source_paths": [
+        "protocols/v1.5.0/PR_REVIEW_CONTRACT.md"
+      ],
+      "destination": "PROJECT_CHARTER.md",
+      "sync_policy": "review_on_upstream_change",
+      "disposition": "ADOPTED_WITH_DIVERGENCE",
+      "divergence_reason": "Evidence identity is extended from one PR head SHA to historical, merge-group, merge-commit, and current-baseline identities."
+    },
+    {
+      "concept_id": "FOUNDATION-VALIDATION-001",
+      "concept": "schema validation, semantic validation, deterministic rendering, fixtures, and release locks",
+      "relationship": "adapted",
+      "source_paths": [
+        "pr_inspector/validation_v2.py",
+        "pr_inspector/repository.py",
+        "release-locks/v1.5.0.sha256"
+      ],
+      "destination": "planned implementation and v1.0.0 protocol",
+      "sync_policy": "review_on_upstream_change",
+      "disposition": "ADOPTED_WITH_DIVERGENCE",
+      "divergence_reason": "Artifact schemas, validators, and outputs are independent and specific to repository-history assurance."
+    }
+  ],
+  "copied_files_verbatim": []
+}
