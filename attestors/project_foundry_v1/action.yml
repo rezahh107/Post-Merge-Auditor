@@ -1,0 +1,54 @@
+name: Project Foundry Trusted Provenance
+description: Verify canonical GitHub Actions and exact PR/push association without executing target-repository code.
+inputs:
+  token:
+    description: Read-only GitHub token.
+    required: true
+  repository:
+    required: true
+  workflow-run-id:
+    required: true
+  run-attempt:
+    required: true
+  expected-workflow-id:
+    required: true
+  expected-workflow-path:
+    required: true
+  expected-head-sha:
+    required: true
+  expected-event:
+    required: true
+  expected-pr-number:
+    required: false
+    default: ""
+  expected-head-ref:
+    required: true
+  expected-base-ref:
+    required: true
+  output-path:
+    required: false
+    default: ""
+outputs:
+  attestation-sha256:
+    description: SHA-256 of the canonical attestation payload.
+    value: ${{ steps.attest.outputs.attestation_sha256 }}
+runs:
+  using: composite
+  steps:
+    - id: attest
+      name: Verify canonical workflow provenance
+      shell: bash
+      env:
+        PF_ATTEST_TOKEN: ${{ inputs.token }}
+        PF_ATTEST_REPOSITORY: ${{ inputs.repository }}
+        PF_ATTEST_RUN_ID: ${{ inputs.workflow-run-id }}
+        PF_ATTEST_RUN_ATTEMPT: ${{ inputs.run-attempt }}
+        PF_ATTEST_WORKFLOW_ID: ${{ inputs.expected-workflow-id }}
+        PF_ATTEST_WORKFLOW_PATH: ${{ inputs.expected-workflow-path }}
+        PF_ATTEST_HEAD_SHA: ${{ inputs.expected-head-sha }}
+        PF_ATTEST_EVENT: ${{ inputs.expected-event }}
+        PF_ATTEST_PR_NUMBER: ${{ inputs.expected-pr-number }}
+        PF_ATTEST_HEAD_REF: ${{ inputs.expected-head-ref }}
+        PF_ATTEST_BASE_REF: ${{ inputs.expected-base-ref }}
+        PF_ATTEST_OUTPUT_PATH: ${{ inputs.output-path }}
+      run: python "$GITHUB_ACTION_PATH/attest.py"
