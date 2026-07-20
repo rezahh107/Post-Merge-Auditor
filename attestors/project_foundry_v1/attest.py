@@ -6,18 +6,21 @@ separate from the target repository. It never executes target-repository code.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
 API_ROOT = "https://api.github.com"
+APPROVED_FOUNDATION_WORKFLOW_SHA256 = "a6973556b2f03a75fea2feecd11cc322a466c9840a7db3aea5704261971a39e1"
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 CANONICAL_JSON_KWARGS = {
     "sort_keys": True,
@@ -96,6 +99,7 @@ def validate_payloads(
     pr: dict[str, Any] | None,
     commit: dict[str, Any] | None = None,
     merge_prs: list[Any] | None = None,
+    workflow_bytes: bytes | None = None,
 ) -> dict[str, Any]:
     """Validate canonical workflow and exact PR/push association."""
     _require(SHA40.fullmatch(inputs.expected_head_sha) is not None, "expected Head SHA is malformed")
@@ -116,6 +120,12 @@ def validate_payloads(
     _require(workflow.get("id") == inputs.expected_workflow_id, "resolved workflow ID mismatch")
     _require(workflow.get("path") == inputs.expected_workflow_path, "resolved workflow path mismatch")
     _require(workflow.get("state") == "active", "canonical workflow is not active")
+    _require(workflow_bytes is not None, "canonical workflow bytes are absent")
+    actual_workflow_sha256 = hashlib.sha256(workflow_bytes).hexdigest()
+    _require(
+        actual_workflow_sha256 == APPROVED_FOUNDATION_WORKFLOW_SHA256,
+        "canonical workflow bytes are not approved by the active attestor policy",
+    )
 
     if inputs.expected_event == "pull_request":
         _require(inputs.expected_pr_number is not None, "PR run lacks an expected PR number")
@@ -197,6 +207,22 @@ def attest(inputs: Inputs, token: str, api_get: Callable[[str, str], Any] = _api
     workflow = api_get(
         f"/repos/{inputs.repository}/actions/workflows/{inputs.expected_workflow_id}", token
     )
+    encoded_path = urllib.parse.quote(inputs.expected_workflow_path, safe="/")
+    workflow_file = api_get(
+        f"/repos/{inputs.repository}/contents/{encoded_path}?ref={inputs.expected_head_sha}",
+        token,
+    )
+    _require(
+        isinstance(workflow_file, dict)
+        and workflow_file.get("encoding") == "base64"
+        and isinstance(workflow_file.get("content"), str),
+        "canonical workflow content payload is invalid",
+    )
+    try:
+        workflow_bytes = base64.b64decode(workflow_file["content"], validate=False)
+    except (ValueError, TypeError) as exc:
+        raise AttestationError("canonical workflow content cannot be decoded") from exc
+
     pr = None
     commit = None
     merge_prs = None
@@ -207,7 +233,7 @@ def attest(inputs: Inputs, token: str, api_get: Callable[[str, str], Any] = _api
         commit = api_get(f"/repos/{inputs.repository}/commits/{inputs.expected_head_sha}", token)
         merge_prs = api_get(f"/repos/{inputs.repository}/commits/{inputs.expected_head_sha}/pulls", token)
         _require(isinstance(merge_prs, list), "commit-to-PR association payload is not a list")
-    return validate_payloads(inputs, run, workflow, pr, commit, merge_prs)
+    return validate_payloads(inputs, run, workflow, pr, commit, merge_prs, workflow_bytes)
 
 
 def _env(name: str, *, required: bool = True) -> str:
