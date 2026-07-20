@@ -50,6 +50,23 @@ def run(event: str = "pull_request") -> dict:
     }
 
 
+def commit(parents: int = 1) -> dict:
+    values = [{"sha": "c" * 40}]
+    if parents == 2:
+        values.append({"sha": "d" * 40})
+    return {"sha": SHA, "parents": values}
+
+
+def merged_pr() -> dict:
+    return {
+        "number": 7,
+        "merged_at": "2026-07-20T00:00:00Z",
+        "merge_commit_sha": SHA,
+        "head": {"sha": "d" * 40, "ref": "agent/example"},
+        "base": {"sha": "c" * 40, "ref": "main", "repo": {"full_name": REPO}},
+    }
+
+
 def workflow() -> dict:
     return {"id": WORKFLOW_ID, "path": WORKFLOW_PATH, "state": "active", "name": "Foundation validation"}
 
@@ -73,8 +90,9 @@ class ProjectFoundryAttestorTests(unittest.TestCase):
         self.assertEqual(len(result["sha256"]), 64)
 
     def test_valid_canonical_main_push(self) -> None:
-        result = validate_payloads(inputs("push"), run("push"), workflow(), None)
+        result = validate_payloads(inputs("push"), run("push"), workflow(), None, commit(), [])
         self.assertEqual(result["target"]["event"], "push")
+        self.assertEqual(result["integration"]["kind"], "linear_main_commit")
 
     def test_duplicate_name_decoy_wrong_workflow_id_is_rejected(self) -> None:
         payload = run()
@@ -110,6 +128,15 @@ class ProjectFoundryAttestorTests(unittest.TestCase):
         payload = run()
         payload["run_attempt"] = 1
         self.assert_rejected(inputs(), payload, workflow(), pr())
+
+    def test_valid_hosted_merge_commit(self) -> None:
+        result = validate_payloads(inputs("push"), run("push"), workflow(), None, commit(2), [merged_pr()])
+        self.assertEqual(result["integration"]["kind"], "merge_commit")
+
+    def test_two_parent_push_without_exact_hosted_merge_is_rejected(self) -> None:
+        self.assert_rejected(inputs("push"), run("push"), workflow(), None)
+        with self.assertRaises(AttestationError):
+            validate_payloads(inputs("push"), run("push"), workflow(), None, commit(2), [])
 
     def test_unpinned_producer_is_rejected(self) -> None:
         inp = inputs()
