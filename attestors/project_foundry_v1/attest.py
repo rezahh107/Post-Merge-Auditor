@@ -94,6 +94,8 @@ def validate_payloads(
     run: dict[str, Any],
     workflow: dict[str, Any],
     pr: dict[str, Any] | None,
+    commit: dict[str, Any] | None = None,
+    merge_prs: list[Any] | None = None,
 ) -> dict[str, Any]:
     """Validate canonical workflow and exact PR/push association."""
     _require(SHA40.fullmatch(inputs.expected_head_sha) is not None, "expected Head SHA is malformed")
@@ -131,6 +133,31 @@ def validate_payloads(
         _require(inputs.expected_head_ref in {"main", "refs/heads/main"}, "push attestation is not bound to main")
         _require(inputs.expected_base_ref in {"main", "refs/heads/main"}, "push base/ref contract is not main")
         _require(run.get("head_branch") == "main", "successful push run is not on main")
+        _require(commit is not None and isinstance(commit, dict), "push commit payload is absent")
+        _require(commit.get("sha") == inputs.expected_head_sha, "push commit identity mismatch")
+        parents = [item.get("sha") for item in commit.get("parents", []) if isinstance(item, dict)]
+        _require(all(isinstance(item, str) and SHA40.fullmatch(item) for item in parents), "push commit has malformed parents")
+        if len(parents) == 2:
+            first, second = parents
+            matches = []
+            for candidate in merge_prs or []:
+                if not isinstance(candidate, dict):
+                    continue
+                head = candidate.get("head") if isinstance(candidate.get("head"), dict) else {}
+                base = candidate.get("base") if isinstance(candidate.get("base"), dict) else {}
+                base_repo = base.get("repo") if isinstance(base.get("repo"), dict) else {}
+                if (
+                    candidate.get("merged_at")
+                    and candidate.get("merge_commit_sha") == inputs.expected_head_sha
+                    and head.get("sha") == second
+                    and base.get("sha") == first
+                    and base.get("ref") == "main"
+                    and base_repo.get("full_name") == inputs.repository
+                ):
+                    matches.append(candidate)
+            _require(len(matches) == 1, "two-parent main push is not bound to exactly one hosted PR merge")
+        elif len(parents) != 1:
+            raise AttestationError("main push has unsupported parent cardinality")
     else:
         raise AttestationError(f"unsupported canonical workflow event: {inputs.expected_event}")
 
@@ -154,6 +181,12 @@ def validate_payloads(
         },
         "result": "trusted",
     }
+    if inputs.expected_event == "push" and commit is not None:
+        parents = [item.get("sha") for item in commit.get("parents", []) if isinstance(item, dict)]
+        attestation["integration"] = {
+            "kind": "merge_commit" if len(parents) == 2 else "linear_main_commit",
+            "parents": parents,
+        }
     canonical = json.dumps(attestation, **CANONICAL_JSON_KWARGS).encode("utf-8")
     attestation["sha256"] = hashlib.sha256(canonical).hexdigest()
     return attestation
@@ -165,10 +198,16 @@ def attest(inputs: Inputs, token: str, api_get: Callable[[str, str], Any] = _api
         f"/repos/{inputs.repository}/actions/workflows/{inputs.expected_workflow_id}", token
     )
     pr = None
+    commit = None
+    merge_prs = None
     if inputs.expected_event == "pull_request":
         _require(inputs.expected_pr_number is not None, "PR number is required")
         pr = api_get(f"/repos/{inputs.repository}/pulls/{inputs.expected_pr_number}", token)
-    return validate_payloads(inputs, run, workflow, pr)
+    elif inputs.expected_event == "push":
+        commit = api_get(f"/repos/{inputs.repository}/commits/{inputs.expected_head_sha}", token)
+        merge_prs = api_get(f"/repos/{inputs.repository}/commits/{inputs.expected_head_sha}/pulls", token)
+        _require(isinstance(merge_prs, list), "commit-to-PR association payload is not a list")
+    return validate_payloads(inputs, run, workflow, pr, commit, merge_prs)
 
 
 def _env(name: str, *, required: bool = True) -> str:
