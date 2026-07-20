@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import sys
 import unittest
 from pathlib import Path
@@ -7,7 +8,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "attestors" / "project_foundry_v1"))
 
+import attest  # noqa: E402
 from attest import AttestationError, Inputs, validate_payloads  # noqa: E402
+
+WORKFLOW_BYTES = b"approved canonical workflow bytes\n"
+attest.APPROVED_FOUNDATION_WORKFLOW_SHA256 = hashlib.sha256(WORKFLOW_BYTES).hexdigest()
 
 SHA = "a" * 40
 PRODUCER = "b" * 40
@@ -82,15 +87,15 @@ def pr() -> dict:
 class ProjectFoundryAttestorTests(unittest.TestCase):
     def assert_rejected(self, inp: Inputs, run_payload: dict, workflow_payload: dict, pr_payload: dict | None) -> None:
         with self.assertRaises(AttestationError):
-            validate_payloads(inp, run_payload, workflow_payload, pr_payload)
+            validate_payloads(inp, run_payload, workflow_payload, pr_payload, workflow_bytes=WORKFLOW_BYTES)
 
     def test_valid_canonical_pr_run(self) -> None:
-        result = validate_payloads(inputs(), run(), workflow(), pr())
+        result = validate_payloads(inputs(), run(), workflow(), pr(), workflow_bytes=WORKFLOW_BYTES)
         self.assertEqual(result["result"], "trusted")
         self.assertEqual(len(result["sha256"]), 64)
 
     def test_valid_canonical_main_push(self) -> None:
-        result = validate_payloads(inputs("push"), run("push"), workflow(), None, commit(), [])
+        result = validate_payloads(inputs("push"), run("push"), workflow(), None, commit(), [], WORKFLOW_BYTES)
         self.assertEqual(result["target"]["event"], "push")
         self.assertEqual(result["integration"]["kind"], "linear_main_commit")
 
@@ -130,13 +135,17 @@ class ProjectFoundryAttestorTests(unittest.TestCase):
         self.assert_rejected(inputs(), payload, workflow(), pr())
 
     def test_valid_hosted_merge_commit(self) -> None:
-        result = validate_payloads(inputs("push"), run("push"), workflow(), None, commit(2), [merged_pr()])
+        result = validate_payloads(inputs("push"), run("push"), workflow(), None, commit(2), [merged_pr()], WORKFLOW_BYTES)
         self.assertEqual(result["integration"]["kind"], "merge_commit")
 
     def test_two_parent_push_without_exact_hosted_merge_is_rejected(self) -> None:
         self.assert_rejected(inputs("push"), run("push"), workflow(), None)
         with self.assertRaises(AttestationError):
-            validate_payloads(inputs("push"), run("push"), workflow(), None, commit(2), [])
+            validate_payloads(inputs("push"), run("push"), workflow(), None, commit(2), [], WORKFLOW_BYTES)
+
+    def test_modified_canonical_workflow_bytes_are_rejected(self) -> None:
+        with self.assertRaises(AttestationError):
+            validate_payloads(inputs(), run(), workflow(), pr(), workflow_bytes=b"modified workflow")
 
     def test_unpinned_producer_is_rejected(self) -> None:
         inp = inputs()
