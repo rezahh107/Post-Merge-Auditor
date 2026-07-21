@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "attestors" / "project_foundry_v1"))
@@ -151,6 +153,38 @@ class ProjectFoundryAttestorTests(unittest.TestCase):
         inp = inputs()
         inp = Inputs(**{**inp.__dict__, "producer_ref": "main"})
         self.assert_rejected(inp, run(), workflow(), pr())
+
+    def test_inputs_from_env_accepts_context_bound_producer_identity(self) -> None:
+        environment = {
+            "PF_ATTEST_REPOSITORY": REPO,
+            "PF_ATTEST_RUN_ID": "1001",
+            "PF_ATTEST_RUN_ATTEMPT": "2",
+            "PF_ATTEST_WORKFLOW_ID": str(WORKFLOW_ID),
+            "PF_ATTEST_WORKFLOW_PATH": WORKFLOW_PATH,
+            "PF_ATTEST_HEAD_SHA": SHA,
+            "PF_ATTEST_EVENT": "pull_request",
+            "PF_ATTEST_PR_NUMBER": "3",
+            "PF_ATTEST_HEAD_REF": "agent/example",
+            "PF_ATTEST_BASE_REF": "main",
+            "GITHUB_ACTION_REPOSITORY": "rezahh107/Post-Merge-Auditor",
+            "GITHUB_ACTION_REF": PRODUCER,
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            parsed = attest.inputs_from_env()
+        self.assertEqual(parsed.producer_repository, "rezahh107/Post-Merge-Auditor")
+        self.assertEqual(parsed.producer_ref, PRODUCER)
+
+    def test_action_maps_github_action_context_into_verifier_environment(self) -> None:
+        action = (ROOT / "attestors" / "project_foundry_v1" / "action.yml").read_text(encoding="utf-8")
+        required_fragments = (
+            "PF_ATTEST_PRODUCER_REPOSITORY: ${{ github.action_repository }}",
+            "PF_ATTEST_PRODUCER_REF: ${{ github.action_ref }}",
+            'export GITHUB_ACTION_REPOSITORY="$PF_ATTEST_PRODUCER_REPOSITORY"',
+            'export GITHUB_ACTION_REF="$PF_ATTEST_PRODUCER_REF"',
+        )
+        for fragment in required_fragments:
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, action)
 
 
 if __name__ == "__main__":
