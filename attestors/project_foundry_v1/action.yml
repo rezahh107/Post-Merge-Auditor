@@ -51,4 +51,9 @@ runs:
         PF_ATTEST_HEAD_REF: ${{ inputs.expected-head-ref }}
         PF_ATTEST_BASE_REF: ${{ inputs.expected-base-ref }}
         PF_ATTEST_OUTPUT_PATH: ${{ inputs.output-path }}
-      run: python "$GITHUB_ACTION_PATH/attest.py"
+        PF_ATTEST_PRODUCER_REPOSITORY: ${{ github.action_repository }}
+        PF_ATTEST_PRODUCER_REF: ${{ github.action_ref }}
+      run: |
+        export GITHUB_ACTION_REPOSITORY="$PF_ATTEST_PRODUCER_REPOSITORY"
+        export GITHUB_ACTION_REF="$PF_ATTEST_PRODUCER_REF"
+        python "$GITHUB_ACTION_PATH/attest.py"
